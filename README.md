@@ -31,7 +31,7 @@ save = brs.default()
 for color_index in range(len(save.colors)):
     brick = brs.Brick.default()
     brick.position = [color_index * 10, 0, 6]
-    brick.color = brs.ColorMode(save.colors[color_index])
+    brick.color = brs.Color(save.colors[color_index])
     save.bricks.append(brick)
 
 brs.writeBRS("colors.brs", save)
