@@ -43,6 +43,35 @@ def test_brick():
     save = brs.default()
     brs.brs._read_brick(r, save)
 
+def test_brick_color():
+    brick = brs.Brick.default()
+    brick.color = brs.Color.from_rgba(255, 255, 255, 255)
+    w = brs.writer.Writer(brs.bits.BitBuffer(b''))
+    brs.brs._write_brick(w, brick, brs.default())
+
+    for byte in w.buffer.buf:
+        binary_string = "{:08b}".format(byte)
+        print(binary_string)
+
+    r = brs.reader.Reader(w.buffer)
+    save = brs.default()
+    brs.brs._read_brick(r, save)
+
+
+def test_colormode():
+    brick = brs.Brick.default()
+    brick.color = brs.ColorMode(0)
+    w = brs.writer.Writer(brs.bits.BitBuffer(b''))
+    brs.brs._write_brick(w, brick, brs.default())
+
+    for byte in w.buffer.buf:
+        binary_string = "{:08b}".format(byte)
+        print(binary_string)
+
+    r = brs.reader.Reader(w.buffer)
+    save = brs.default()
+    brs.brs._read_brick(r, save)
+
 def test_u32_bits():
     w = brs.writer.Writer(brs.bits.BitBuffer(b''))
     obj = brs.Color(1)
@@ -51,4 +80,6 @@ def test_u32_bits():
     r = brs.reader.Reader(w.buffer)
     print(r.u32_bits())
 
-brs.readBRS("example_saves/Lighthouse_Island.brs", verbose=True)
+test_brick_color()
+test_write_new()
+test_colormode()

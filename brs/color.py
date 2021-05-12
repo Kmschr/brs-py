@@ -1,6 +1,7 @@
 
 class ColorMode:
     def __init__(self, index):
+        super().__init__()
         self.val = index
 
     def __str__(self):
@@ -8,6 +9,8 @@ class ColorMode:
 
 class Color(ColorMode):
     def __init__(self, val):
+        if isinstance(val, Color):
+            val = val.val
         super().__init__(val)
 
     @staticmethod

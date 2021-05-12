@@ -278,7 +278,7 @@ def _write_brick(w, brick, save):
     if isinstance(brick.color, Color):
         w.bit(True)
         w.u32_bits(brick.color.val)
-    else:
+    elif isinstance(brick.color, ColorMode):
         w.bit(False)
         w.int_max(brick.color.val, max(len(save.colors), 2))
     w.int_packed(brick.owner_index)

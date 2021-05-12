@@ -34,7 +34,7 @@ class Writer:
         self.buffer.write(val.to_bytes(8, "little"))
 
     def u32_bits(self, val):
-        self.bitss(val.val.to_bytes(4, "little"), 32)
+        self.bitss(val.to_bytes(4, "little"), 32)
 
     def int_max(self, val, max_val):
         new_val = 0

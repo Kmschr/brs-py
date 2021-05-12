@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="brs-py",
-    version="0.5.1",
+    version="0.5.2",
     author="Kevin Schroeder",
     author_email="Kmschr@gmail.com",
     description="Brickadia savefile reader/writer",
