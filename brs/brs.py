@@ -221,7 +221,7 @@ def _read_brick(r, save):
     save.bricks.append(brick)
     r.byte_align()
 
-def writeBRS(filename, save):
+def writeBRS(filename, save, compressed=True):
     # Write Preamble
     brs = open(filename, "wb")
     w = Writer(brs)
@@ -238,7 +238,7 @@ def writeBRS(filename, save):
     h1.user_name_first(save.host)
     h1.datetime(save.time)
     h1.u32(len(save.bricks))
-    w.write_compressed(h1.buffer.buf)
+    w.write_compressed(h1.buffer.buf, compressed)
 
     # Write Header2
     h2 = Writer(Bytes(b''))
@@ -247,7 +247,7 @@ def writeBRS(filename, save):
     h2.array(len(save.colors), lambda i : h2.color(save.colors[i]))
     h2.array(len(save.materials), lambda i : h2.string(save.materials[i]))
     h2.array(len(save.brick_owners), lambda i : h2.brick_owner(save.brick_owners[i]))
-    w.write_compressed(h2.buffer.buf)
+    w.write_compressed(h2.buffer.buf, compressed)
 
     # Write Screenshot
     if save.screenshot_data is not None:
@@ -261,7 +261,7 @@ def writeBRS(filename, save):
     bricks = Writer(BitBuffer(b''))
     for brick in save.bricks:
         _write_brick(bricks, brick, save)
-    w.write_compressed(bricks.buffer.buf)
+    w.write_compressed(bricks.buffer.buf, compressed)
 
 def _write_brick(w, brick, save):
     w.int_max(brick.asset_index, max(len(save.brick_assets), 2))
