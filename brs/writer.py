@@ -9,7 +9,13 @@ class Writer:
     def write(self, barr):
         self.buffer.write(barr)
 
-    def write_compressed(self, barr):
+    def write_compressed(self, barr, should_compress=True):
+        if not should_compress:
+            self.u32(len(barr))
+            self.u32(0)
+            self.write(barr)
+            return
+        
         compressed = zlib.compress(barr)
         uncompressed_len = len(barr)
         compressed_len = len(compressed)
