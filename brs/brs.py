@@ -156,6 +156,34 @@ class Brick:
         ]
         return (min_pos, max_pos)
 
+    def overlaps(self, other: 'Brick') -> bool:
+        """Check if this brick overlaps with another brick (AABB).
+        
+        Using Separating Axis Theorem (or just simple AABB check).
+        Overlaps if they intersect on all 3 axes.
+        Touching faces (equality) is NOT considered overlapping.
+        
+        Args:
+            other: The other brick to check against.
+            
+        Returns:
+            True if the bricks overlap, False otherwise.
+        """
+        min1, max1 = self.get_bounds()
+        min2, max2 = other.get_bounds()
+        
+        # Check x-axis
+        if max1[0] <= min2[0] or max2[0] <= min1[0]:
+            return False
+        # Check y-axis
+        if max1[1] <= min2[1] or max2[1] <= min1[1]:
+            return False
+        # Check z-axis
+        if max1[2] <= min2[2] or max2[2] <= min1[2]:
+            return False
+            
+        return True
+
 
 class BRS:
     """Represents a full Brickadia save file.
