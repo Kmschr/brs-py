@@ -1,46 +1,90 @@
+"""Main module for reading and writing Brickadia save files.
+
+This module provides the main classes and functions for interacting with
+Brickadia save files (BRS), including the BRS class representing a save,
+and functions to read and write them.
+"""
 import zlib
 import uuid
-import datetime
+from datetime import datetime, timezone
+
 import textwrap
 from enum import Enum
+from typing import List, Optional, Dict, Any, Union
+
 from .reader import Reader
 from .writer import Writer
-from .user import User
+from .user import User, BrickOwner
 from .utils import read_orientation, pack_orientation
-from .color import *
-from .bits import *
-from .orientation import *
+from .color import Color, ColorMode
+from .bits import BitBuffer, Bytes
+from .orientation import Direction, Rotation
 
-_MAGIC = b'BRS'
-_VERSION = 8
-_GAME_VERSION = 6094
+_MAGIC: bytes = b'BRS'
+_VERSION: int = 8
+_GAME_VERSION: int = 6094
+
 
 class ScreenshotFormat(Enum):
+    """Format of the embedded screenshot in the save file."""
     NONE = 0
     PNG = 1
 
-class Component():
-    def __init__(self):
-        self.version = None
-        self.brick_indices = None
-        self.properties = []
 
-class Brick():
-    def __init__(self):
-        self.asset_index = None
-        self.size = None
-        self.position = None
-        self.color = None
-        self.direction = None
-        self.rotation = None
-        self.collision = None
-        self.visibility = None
-        self.material_index = None
-        self.owner_index = None
-        self.components = None
+class Component:
+    """A component attached to one or more bricks.
+    
+    Attributes:
+        version: Version of the component data.
+        brick_indices: List of indices of bricks this component is attached to.
+        properties: Dictionary of properties for this component.
+    """
+    
+    def __init__(self) -> None:
+        """Initialize a new Component."""
+        self.version: Optional[int] = None
+        self.brick_indices: Optional[List[int]] = None
+        self.properties: Dict[str, Any] = {}
+
+
+class Brick:
+    """Represents a single brick in the save file.
+    
+    Attributes:
+        asset_index: Index of the brick asset in the save's brick_assets list.
+        size: Dimensions of the brick [x, y, z].
+        position: Position of the brick [x, y, z].
+        color: Color of the brick (Color or ColorMode).
+        direction: Facing direction of the brick.
+        rotation: Rotation of the brick relative to direction.
+        collision: Whether the brick has collision.
+        visibility: Whether the brick is visible.
+        material_index: Index of the material in the save's materials list.
+        owner_index: Index of the owner in the save's brick_owners list.
+        components: Dictionary of components attached to this brick.
+    """
+    
+    def __init__(self) -> None:
+        """Initialize a new Brick."""
+        self.asset_index: int = 0
+        self.size: List[int] = [0, 0, 0]
+        self.position: List[int] = [0, 0, 0]
+        self.color: Union[Color, ColorMode] = ColorMode(0)
+        self.direction: Direction = Direction.ZPositive
+        self.rotation: Rotation = Rotation.Deg0
+        self.collision: bool = True
+        self.visibility: bool = True
+        self.material_index: int = 0
+        self.owner_index: int = 0
+        self.components: Optional[Dict[str, Any]] = None
 
     @staticmethod
-    def default():
+    def default() -> 'Brick':
+        """Create a default 1x1 brick.
+        
+        Returns:
+            A new Brick instance with default values.
+        """
         brick = Brick()
         brick.asset_index = 0
         brick.size = [5, 5, 6]
@@ -54,7 +98,8 @@ class Brick():
         brick.owner_index = 0
         return brick
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """String representation of the brick."""
         return '''\
             Asset Index: {}
             Size: {}
@@ -68,26 +113,50 @@ class Brick():
             Owner Index: {}
             '''.format(self.asset_index, self.size, self.position, self.color, self.direction, self.rotation, self.collision, self.visibility, self.material_index, self.owner_index)
 
-class BRS:
-    def __init__(self):
-        self.version = None
-        self.game_version = None
-        self.map = None
-        self.description = None
-        self.author = None
-        self.host = None
-        self.time = None
-        self.brickcount = None
-        self.mods = []
-        self.brick_assets = []
-        self.colors = []
-        self.materials = []
-        self.brick_owners = []
-        self.screenshot_data = None
-        self.bricks = []
-        self.components = dict()
 
-    def __str__(self):
+class BRS:
+    """Represents a full Brickadia save file.
+    
+    Attributes:
+        version: Save version.
+        game_version: Game version the save was created in.
+        map: Name of the map.
+        description: Save description.
+        author: Author of the save.
+        host: Host who saved the file.
+        time: Timestamp of the save.
+        brickcount: Number of bricks in the save.
+        mods: List of mods used.
+        brick_assets: List of brick assets used.
+        colors: List of colors in the palette.
+        materials: List of materials used.
+        brick_owners: List of brick owners.
+        screenshot_data: Raw PNG data for the embedded screenshot.
+        bricks: List of Brick objects.
+        components: Dictionary of Component objects.
+    """
+    
+    def __init__(self) -> None:
+        """Initialize a new BRS save."""
+        self.version: int = _VERSION
+        self.game_version: int = _GAME_VERSION
+        self.map: str = "Plate"
+        self.description: str = ""
+        self.author: User = User("Unknown", uuid.UUID(int=0))
+        self.host: User = User("Unknown", uuid.UUID(int=0))
+        self.time: datetime = datetime.now(timezone.utc)
+        self.brickcount: int = 0
+        self.mods: List[str] = []
+        self.brick_assets: List[str] = []
+        self.colors: List[Color] = []
+        self.materials: List[str] = []
+        self.brick_owners: List[BrickOwner] = []
+        self.screenshot_data: Optional[bytes] = None
+        self.bricks: List[Brick] = []
+        self.components: Dict[str, Component] = dict()
+
+    def __str__(self) -> str:
+        """String representation of the BRS save metadata."""
         return textwrap.dedent('''\
         Version {}
         Game Version {}
@@ -103,103 +172,127 @@ class BRS:
         Materials: {}
         Brick Owners: {}'''.format(self.version, self.game_version, self.map, self.description, self.author, self.host, self.time, len(self.bricks), self.mods, self.brick_assets, self.colors, self.materials, self.brick_owners))
 
-def readBRS(filename, verbose=False):
+
+def readBRS(filename: str, verbose: bool = False) -> BRS:
+    """Read a .brs file from disk.
+    
+    Args:
+        filename: Path to the .brs file.
+        verbose: Whether to print debug information during reading.
+        
+    Returns:
+        The parsed BRS object.
+        
+    Raises:
+        Exception: If the file is not a valid BRS file.
+    """
+
+    
     # Read Preamble
     if verbose:
         print("Reading", filename)
-    brs = open(filename, "rb")
-    r = Reader(brs)
-    magic = r.read(3)
-    if magic != _MAGIC:
-        raise Exception("Not a valid BRS file")
-    save = BRS()
-    save.version = r.u16()
-    save.game_version = r.u32()
+    with open(filename, "rb") as brs:
+        r = Reader(brs)
+        magic = r.read(3)
+        if magic != _MAGIC:
+            raise Exception("Not a valid BRS file")
+        save = BRS()
+        save.version = r.u16()
+        save.game_version = r.u32()
 
-    # Read Header 1
-    r.buffer = r.read_compressed()
-    save.map = r.string()
-    author_name = r.string()
-    save.description = r.string()
-    author_id = r.id()
-    save.author = User(author_name, author_id)
-    save.host = r.user_name_first()
-    save.time = r.datetime()
-    save.brickcount = r.u32()
-    if verbose:
-        print("Map:", save.map)
-        print("Description:", save.description)
-        print("Author:", save.author) 
-        print("Host:", save.host)
-        print("Savetime:", save.time)
-        print("Brickcount: {:,}".format(save.brickcount))
 
-    # Read Header 2
-    r.buffer = brs
-    r.buffer = r.read_compressed()
-    save.mods = r.array(r.string)
-    save.brick_assets = r.array(r.string)
-    save.colors = r.array(r.color)
-    save.materials = r.array(r.string)
-    save.brick_owners = r.array(r.brick_owner)
-    if verbose:
-        print("Mods:", save.mods)
-        print("Brick Assets:", save.brick_assets)
-        print("Colors:", save.colors)
-        print("Materials:", save.materials)
-        print("Brick Owners:", save.brick_owners)
-
-    # Read Screenshot
-    r.buffer = brs
-    screenshot_format = ScreenshotFormat(r.u8())
-    if verbose:
-        print("Screenshot Format:", screenshot_format.name)
-    if screenshot_format == ScreenshotFormat.PNG:
-        screenshot_data_len = r.u32()
-        save.screenshot_data = r.read(screenshot_data_len)
-
-    # Read bricks
-    r.buffer = r.read_compressed()
-    save.bricks = []
-    for _ in range(save.brickcount):
-        _read_brick(r, save)
-
-    if verbose:
-        print("Bricks:", len(save.bricks))
-
-    # Read components
-    r.buffer = brs
-    r.buffer = r.read_compressed()
-    num_components = r.u32()
-    for _ in range(num_components):
-        name = r.string()
-        r.u32()
-        version = r.u32()
+        # Read Header 1
+        r.buffer = r.read_compressed()
+        save.map = r.string()
+        author_name = r.string()
+        save.description = r.string()
+        author_id = r.id()
+        save.author = User(author_name, author_id)
+        save.host = r.user_name_first()
+        save.time = r.datetime()
+        save.brickcount = r.u32()
         if verbose:
-            print("{} (v{})".format(name, version))
-        indices = r.array_bits(lambda: r.int_max(max(len(save.bricks), 2)))
+            print("Map:", save.map)
+            print("Description:", save.description)
+            print("Author:", save.author) 
+            print("Host:", save.host)
+            print("Savetime:", save.time)
+            print("Brickcount: {:,}".format(save.brickcount))
+    
+        # Read Header 2
+        r.buffer = brs
+        r.buffer = r.read_compressed()
+        save.mods = r.array(r.string)
+        save.brick_assets = r.array(r.string)
+        save.colors = r.array(r.color)
+        save.materials = r.array(r.string)
+        save.brick_owners = r.array(r.brick_owner)
         if verbose:
-            print("Bricks:", len(indices))
-        properties = r.array_bits(lambda: [r.string_bits(), r.string_bits()])
+            print("Mods:", save.mods)
+            print("Brick Assets:", save.brick_assets)
+            print("Colors:", save.colors)
+            print("Materials:", save.materials)
+            print("Brick Owners:", save.brick_owners)
+    
+        # Read Screenshot
+        r.buffer = brs
+        screenshot_format = ScreenshotFormat(r.u8())
         if verbose:
-            print("Properties:",properties)
-        for i in indices:
-            props = dict()
-            for prop in properties:
-                props[prop[0]] = r.unreal(prop[1])
-            if save.bricks[i].components is None:
-                save.bricks[i].components = dict()
-            save.bricks[i].components[name] = props
-        component = Component()
-        component.version = version
-        component.brick_indices = indices
-        component.properties = properties
-        save.components[name] = component
-        r.byte_align()
-    brs.close()
+            print("Screenshot Format:", screenshot_format.name)
+        if screenshot_format == ScreenshotFormat.PNG:
+            screenshot_data_len = r.u32()
+            save.screenshot_data = r.read(screenshot_data_len)
+    
+        # Read bricks
+        r.buffer = r.read_compressed()
+        save.bricks = []
+        for _ in range(save.brickcount):
+            _read_brick(r, save)
+    
+        if verbose:
+            print("Bricks:", len(save.bricks))
+    
+        # Read components
+        r.buffer = brs
+        r.buffer = r.read_compressed()
+        num_components = r.u32()
+        for _ in range(num_components):
+            name = r.string()
+            r.u32()
+            version = r.u32()
+            if verbose:
+                print("{} (v{})".format(name, version))
+            indices = r.array_bits(lambda: r.int_max(max(len(save.bricks), 2)))
+            if verbose:
+                print("Bricks:", len(indices))
+            properties = r.array_bits(lambda: [r.string_bits(), r.string_bits()])
+            if verbose:
+                print("Properties:",properties)
+            for i in indices:
+                props = dict()
+                for prop in properties:
+                    props[prop[0]] = r.unreal(prop[1])
+                if save.bricks[i].components is None:
+                    save.bricks[i].components = dict()
+                save.bricks[i].components[name] = props
+            component = Component()
+            component.version = version
+            component.brick_indices = indices
+            component.properties = properties
+            save.components[name] = component
+            r.byte_align()
+
     return save
 
-def _read_brick(r, save):
+
+def _read_brick(r: Reader, save: BRS) -> None:
+    """Read a single brick from the reader.
+    
+    Args:
+        r: The Reader instance.
+        save: The BRS object relative to which indices are resolved.
+    """
+
     brick = Brick()
     brick.asset_index = r.int_max(max(len(save.brick_assets), 2))
     brick.size = [0, 0, 0]
@@ -221,49 +314,69 @@ def _read_brick(r, save):
     save.bricks.append(brick)
     r.byte_align()
 
-def writeBRS(filename, save, compressed=True):
+
+def writeBRS(filename: str, save: BRS, compressed: bool = True) -> None:
+    """Write a BRS object to a .brs file.
+    
+    Args:
+        filename: Path to output file.
+        save: The BRS object to write.
+        compressed: Whether to compress the data (zlib).
+    """
+
     # Write Preamble
-    brs = open(filename, "wb")
-    w = Writer(brs)
-    w.write(_MAGIC)
-    w.u16(save.version)
-    w.u32(save.game_version)
+    with open(filename, "wb") as brs:
+        w = Writer(brs)
+        w.write(_MAGIC)
+        w.u16(save.version)
+        w.u32(save.game_version)
 
-    # Write Header1
-    h1 = Writer(Bytes(b''))
-    h1.string(save.map)
-    h1.string(save.author.name)
-    h1.string(save.description)
-    h1.id(save.author.uuid)
-    h1.user_name_first(save.host)
-    h1.datetime(save.time)
-    h1.u32(len(save.bricks))
-    w.write_compressed(h1.buffer.buf, compressed)
 
-    # Write Header2
-    h2 = Writer(Bytes(b''))
-    h2.array(len(save.mods), lambda i : h2.string(save.mods[i]))
-    h2.array(len(save.brick_assets), lambda i : h2.string(save.brick_assets[i]))
-    h2.array(len(save.colors), lambda i : h2.color(save.colors[i]))
-    h2.array(len(save.materials), lambda i : h2.string(save.materials[i]))
-    h2.array(len(save.brick_owners), lambda i : h2.brick_owner(save.brick_owners[i]))
-    w.write_compressed(h2.buffer.buf, compressed)
+        # Write Header1
+        h1 = Writer(Bytes(b''))
+        h1.string(save.map)
+        h1.string(save.author.name)
+        h1.string(save.description)
+        h1.id(save.author.uuid)
+        h1.user_name_first(save.host)
+        h1.datetime(save.time)
+        h1.u32(len(save.bricks))
+        w.write_compressed(h1.buffer.buf, compressed)
+    
+        # Write Header2
+        h2 = Writer(Bytes(b''))
+        h2.array(len(save.mods), lambda i : h2.string(save.mods[i]))
+        h2.array(len(save.brick_assets), lambda i : h2.string(save.brick_assets[i]))
+        h2.array(len(save.colors), lambda i : h2.color(save.colors[i]))
+        h2.array(len(save.materials), lambda i : h2.string(save.materials[i]))
+        h2.array(len(save.brick_owners), lambda i : h2.brick_owner(save.brick_owners[i]))
+        w.write_compressed(h2.buffer.buf, compressed)
+    
+        # Write Screenshot
+        if save.screenshot_data is not None:
+            w.u8(ScreenshotFormat.PNG.value)
+            w.u32(len(save.screenshot_data))
+            w.write(save.screenshot_data)
+        else:
+            w.u8(ScreenshotFormat.NONE.value)
+    
+        # Write Bricks
+        bricks = Writer(BitBuffer(b''))
+        for brick in save.bricks:
+            _write_brick(bricks, brick, save)
+        w.write_compressed(bricks.buffer.buf, compressed)
 
-    # Write Screenshot
-    if save.screenshot_data is not None:
-        w.u8(ScreenshotFormat.PNG.value)
-        w.u32(len(save.screenshot_data))
-        w.write(save.screenshot_data)
-    else:
-        w.u8(ScreenshotFormat.NONE.value)
 
-    # Write Bricks
-    bricks = Writer(BitBuffer(b''))
-    for brick in save.bricks:
-        _write_brick(bricks, brick, save)
-    w.write_compressed(bricks.buffer.buf, compressed)
 
-def _write_brick(w, brick, save):
+def _write_brick(w: Writer, brick: Brick, save: BRS) -> None:
+    """Write a single brick to the writer.
+    
+    Args:
+        w: The Writer instance.
+        brick: The brick to write.
+        save: The BRS object relative to which indices are resolved.
+    """
+
     w.int_max(brick.asset_index, max(len(save.brick_assets), 2))
     if all(v == 0 for v in brick.size):
         w.bit(False)
@@ -284,7 +397,13 @@ def _write_brick(w, brick, save):
     w.int_packed(brick.owner_index)
     w.flush_byte()
 
-def default():
+
+def default() -> BRS:
+    """Create a default BRS save with standard colors, assets, and materials.
+    
+    Returns:
+        A new BRS instance populated with default game data.
+    """
     save = BRS()
     save.version = _VERSION
     save.game_version = _GAME_VERSION
@@ -297,5 +416,6 @@ def default():
     save.colors = [4294967295, 4287137928, 4284045657, 4281940281, 4280492835, 4279308561, 4278584838, 4278190080, 4283893001, 4293527046, 4294330630, 4293565702, 4278749701, 4278491306, 4288881493, 4284092983, 4279632897, 4281406477, 4284026884, 4287642642, 4289095742, 4294942542, 4290945850, 4294946607, 4278522373, 4278525442, 4279575552, 4278209536, 4278924810, 4282601228, 4294939146, 4285349893, 4278853163, 4280166185, 4282866784, 4286819509, 4283470754, 4278744776, 4278206586, 4278264384, 2583629326, 2583677957, 2568982546, 2569766333, 2572616969, 2583054598, 2567449359, 2583691263, 2583691263, 2575861896, 2572769625, 2570664249, 2569216803, 2568032529, 2567308806, 2566914048]
     for i in range(len(save.colors)):
         save.colors[i] = Color(save.colors[i])
-    save.time = datetime.datetime.utcnow()
+    save.brick_owners = [BrickOwner(save.author.name, save.author.uuid, 0)]
+    save.time = datetime.now(timezone.utc)
     return save
