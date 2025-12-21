@@ -6,7 +6,7 @@ to binary format, supporting both byte and bit-level operations.
 import uuid
 import zlib
 from datetime import datetime
-from typing import Any, Callable, List, Union
+from typing import Any, Callable, List, Union, Dict
 from .utils import ue4_basetime
 from .bits import Bytes, BitBuffer
 from .user import User, BrickOwner
@@ -254,3 +254,39 @@ class Writer:
         self.int_packed(f(vec[0]))
         self.int_packed(f(vec[1]))
         self.int_packed(f(vec[2]))
+
+    def i32(self, val: int) -> None:
+        """Write a signed 32-bit integer.
+        
+        Args:
+            val: Value to write.
+        """
+        self.buffer.write(val.to_bytes(4, "little", signed=True))
+
+    def array_bits(self, arr: Union[List[Any], Dict[Any, Any]], func: Callable[[Any], None]) -> None:
+        """Write an array with bit-packed size.
+        
+        Args:
+            arr: List or Dict to write.
+            func: Function to write each element.
+        """
+        l = len(arr)
+        self.u32_bits(l)
+        
+        if isinstance(arr, dict):
+             for item in arr.items():
+                 func(item)
+        else:
+            for item in arr:
+                func(item)
+
+    def string_bits(self, val: str) -> None:
+        """Write a string with bit-packed length.
+        
+        Args:
+            val: String to write.
+        """
+        self.u32_bits(len(val) + 1)
+        for char in val.encode('utf-8'):
+            self.bits(char, 8)
+        self.bits(0, 8)
