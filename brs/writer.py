@@ -98,7 +98,7 @@ class Writer:
         Args:
             val: Value to write.
         """
-        self.bitss(val.to_bytes(4, "little"), 32)
+        self.buffer.write_int(val, 32)
 
     def int_max(self, val: int, max_val: int) -> None:
         """Write a variable-length integer with a maximum value.
@@ -222,8 +222,7 @@ class Writer:
             val: Integer containing bits to write.
             size: Number of bits to write.
         """
-        for i in range(size):
-            self.bit(val & (1 << (i & 7)) != 0)
+        self.buffer.write_int(val, size)
 
     def bitss(self, val: bytes, size: int) -> None:
         """Write multiple bits from a byte array.

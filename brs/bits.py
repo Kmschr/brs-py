@@ -20,7 +20,7 @@ class Bytes:
         Args:
             buf: Initial byte buffer.
         """
-        self.buf = buf
+        self.buf = bytearray(buf)
         self.pos = 0
 
     def read(self, size: int) -> bytes:
@@ -34,7 +34,8 @@ class Bytes:
         """
         val = self.buf[(self.pos >> 3):(self.pos >> 3) + size]
         self.pos += (size << 3)
-        return val
+        # Return bytes (immutable)
+        return bytes(val)
 
     def write(self, barr: bytes) -> None:
         """Write bytes to the buffer.
@@ -42,7 +43,7 @@ class Bytes:
         Args:
             barr: Bytes to write.
         """
-        self.buf += barr
+        self.buf.extend(barr)
 
     def __str__(self) -> str:
         """Decode buffer as UTF-8 string."""
@@ -55,7 +56,7 @@ class BitBuffer(Bytes):
     Extends Bytes with bit-level read/write operations.
     
     Attributes:
-        buf: The underlying byte buffer.
+        buf: The underlying byte buffer (bytearray).
         pos: Current position in bits.
         cur: Current byte being written.
         bit: Current bit position within cur.
@@ -77,9 +78,11 @@ class BitBuffer(Bytes):
         Returns:
             Boolean value of the bit.
         """
-        bit = (self.buf[self.pos >> 3] & (1 << (self.pos & 7))) != 0
+        # Read from bytearray
+        byte_val = self.buf[self.pos >> 3]
+        bit_val = (byte_val & (1 << (self.pos & 7))) != 0
         self.pos += 1
-        return bit
+        return bit_val
 
     def write_bit(self, val: bool) -> None:
         """Write a single bit to the buffer.
@@ -99,6 +102,32 @@ class BitBuffer(Bytes):
     def flush_byte(self) -> None:
         """Flush the current partial byte to the buffer."""
         if self.bit > 0:
-            self.write(self.cur.to_bytes(1, byteorder="little", signed=False))
+            self.buf.append(self.cur)
             self.cur = 0
             self.bit = 0
+
+    def write_int(self, val: int, count: int) -> None:
+        """Write multiple bits from an integer.
+        
+        Args:
+            val: Integer containing bits to write.
+            count: Number of bits to write.
+        """
+        remaining = count
+        while remaining > 0:
+            space = 8 - self.bit
+            take = min(space, remaining)
+            
+            mask = (1 << take) - 1
+            chunk = val & mask
+            
+            self.cur |= chunk << self.bit
+            self.bit += take
+            
+            val >>= take
+            remaining -= take
+            
+            if self.bit >= 8:
+                self.buf.append(self.cur)
+                self.cur = 0
+                self.bit = 0

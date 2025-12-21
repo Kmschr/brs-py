@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 import textwrap
 from enum import Enum
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any, Union, Tuple, Sequence
 
 from .reader import Reader
 from .writer import Writer
@@ -101,7 +101,6 @@ class Brick:
     def __str__(self) -> str:
         """String representation of the brick."""
         return '''\
-            Asset Index: {}
             Size: {}
             Position: {}
             Color: {}
@@ -112,6 +111,50 @@ class Brick:
             Material Index: {}
             Owner Index: {}
             '''.format(self.asset_index, self.size, self.position, self.color, self.direction, self.rotation, self.collision, self.visibility, self.material_index, self.owner_index)
+
+    @staticmethod
+    def from_bounds(min_pos: Sequence[int], max_pos: Sequence[int]) -> 'Brick':
+        """Create a brick from min/max bounds (AABB).
+        
+        Args:
+            min_pos: Minimum corner [x, y, z].
+            max_pos: Maximum corner [x, y, z].
+            
+        Returns:
+            A new Brick instance with calculated position and size.
+        """
+        brick = Brick()
+        # center = (max + min) / 2
+        brick.position = [
+            (max_pos[0] + min_pos[0]) // 2,
+            (max_pos[1] + min_pos[1]) // 2,
+            (max_pos[2] + min_pos[2]) // 2
+        ]
+        # size = (max - min) / 2
+        brick.size = [
+            (max_pos[0] - min_pos[0]) // 2,
+            (max_pos[1] - min_pos[1]) // 2,
+            (max_pos[2] - min_pos[2]) // 2
+        ]
+        return brick
+
+    def get_bounds(self) -> Tuple[List[int], List[int]]:
+        """Get the min/max bounds of the brick.
+        
+        Returns:
+            Tuple of ([min_x, min_y, min_z], [max_x, max_y, max_z]).
+        """
+        min_pos = [
+            self.position[0] - self.size[0],
+            self.position[1] - self.size[1],
+            self.position[2] - self.size[2]
+        ]
+        max_pos = [
+            self.position[0] + self.size[0],
+            self.position[1] + self.size[1],
+            self.position[2] + self.size[2]
+        ]
+        return (min_pos, max_pos)
 
 
 class BRS:
